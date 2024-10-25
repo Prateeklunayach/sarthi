@@ -3,10 +3,23 @@
 import React, { useState, useEffect, useRef } from 'react'
 
 import { Heart, Activity, Volume2, AlertTriangle, Mic, MapPin } from 'lucide-react'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
 
-// Leaflet CSS import (you'll need to add this to your project)
-// import 'leaflet/dist/leaflet.css'
+// Import Leaflet icon images
+import icon from '/Users/prateeklunayach/Desktop/sarthi/sarthi/public/map.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
+
+// Set up the default icon for Leaflet
+let DefaultIcon = L.icon({
+    iconUrl: icon,
+    shadowUrl: iconShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41]
+});
+
+L.Marker.prototype.options.icon = DefaultIcon;
 
 function ECGGraph({ color = 'red', rate = 70 }) {
   const svgRef = useRef(null);
@@ -64,6 +77,24 @@ function MonitorBox({ title, value, icon, color, bgColor, showGraph, rate }) {
       <p className="text-3xl font-bold mb-2">{value}</p>
       {showGraph && <ECGGraph color={color.replace('text-', '')} rate={rate} />}
     </div>
+  )
+}
+
+function LocationMarker() {
+  const [position, setPosition] = useState(null)
+  const map = useMap()
+
+  useEffect(() => {
+    map.locate().on("locationfound", function (e) {
+      setPosition(e.latlng)
+      map.flyTo(e.latlng, 13)
+    })
+  }, [map])
+
+  return position === null ? null : (
+    <Marker position={position}>
+      <Popup>You are here</Popup>
+    </Marker>
   )
 }
 
