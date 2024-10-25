@@ -1,11 +1,71 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+
 import { Heart, Activity, Volume2, AlertTriangle, Mic, MapPin } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 
 // Leaflet CSS import (you'll need to add this to your project)
 // import 'leaflet/dist/leaflet.css'
+
+function ECGGraph({ color = 'red', rate = 70 }) {
+  const svgRef = useRef(null);
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    let path = '';
+    let x = 0;
+    const interval = 1200 / rate; // Adjust this value to change the speed of the graph
+
+    function drawLine() {
+      const y = 50;
+      path += `${x},${y} `;
+      x += 1;
+
+      if (x >= 400) {
+        x = 0;
+        path = '';
+      }
+
+      if (x % 40 === 0) {
+        // P wave
+        path += `${x},${y} ${x+5},${y-10} ${x+10},${y} `;
+        // QRS complex
+        path += `${x+15},${y} ${x+17},${y+30} ${x+19},${y-30} ${x+21},${y+10} ${x+23},${y} `;
+        // T wave
+        path += `${x+30},${y} ${x+35},${y+10} ${x+40},${y} `;
+        x += 40;
+      }
+
+      svg.innerHTML = `<path d="M ${path}" fill="none" stroke="${color}" stroke-width="2" />`;
+
+      requestAnimationFrame(drawLine);
+    }
+
+    drawLine();
+
+    return () => cancelAnimationFrame(drawLine);
+  }, [color, rate]);
+
+  return (
+    <svg ref={svgRef} viewBox="0 0 400 100" className="w-full h-16">
+      <path d="" fill="none" stroke={color} strokeWidth="2" />
+    </svg>
+  );
+}
+
+function MonitorBox({ title, value, icon, color, bgColor, showGraph, rate }) {
+  return (
+    <div className={`rounded-lg shadow-md p-6 ${bgColor}`}>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold">{title}</h2>
+        <div className={color}>{icon}</div>
+      </div>
+      <p className="text-3xl font-bold mb-2">{value}</p>
+      {showGraph && <ECGGraph color={color.replace('text-', '')} rate={rate} />}
+    </div>
+  )
+}
 
 export default function Component() {
   const [heartRate, setHeartRate] = useState(70)
@@ -24,8 +84,9 @@ export default function Component() {
 
   const [alertTimeout, setAlertTimeout] = useState(null)
   const [showPopup, setShowPopup] = useState(false)
+  const [simulationRate, setSimulationRate] = useState(70)
 
- // Remove or comment out the useEffect for simulating heart rate and pulse rate changes
+  // Remove or comment out the useEffect for simulating heart rate and pulse rate changes
   //as we'll now control these directly in the alert logic
   useEffect(() => {
     // Simulate heart rate and pulse rate changes
@@ -49,8 +110,41 @@ export default function Component() {
       )
     }
 
-    return () => clearInterval(interval)
+    // Set up interval to send data to backend
+    const intervalId = setInterval(sendDataToBackend, 5000);
+
+    // Clean up interval on component unmount
+    return () => clearInterval(intervalId);
   }, [])
+
+  const sendDataToBackend = async () => {
+    const data = {
+      heartRate,
+      pulseRate,
+      detectedKeyword,
+      location,
+      timestamp: new Date().toISOString()
+    };
+
+    try {
+      const response = await fetch('/api/send-data', {  // Replace with your actual API endpoint
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Data sent successfully:', result);
+    } catch (error) {
+      console.error('Error sending data to backend:', error);
+    }
+  };
 
   const startListening = async () => {
     try {
@@ -169,6 +263,13 @@ export default function Component() {
     }
   }
 
+  const handleSimulationChange = (event) => {
+    const newRate = parseInt(event.target.value)
+    setSimulationRate(newRate)
+    setHeartRate(newRate)
+    setPulseRate(newRate)
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-pink-100 to-purple-200">
       <div className="container mx-auto px-4 py-8">
@@ -191,6 +292,20 @@ export default function Component() {
             </div>
           </div>
         )}
+        <div className="mb-8">
+          <label htmlFor="simulation" className="block text-sm font-medium text-gray-700">
+            Simulation Rate: {simulationRate} BPM
+          </label>
+          <input
+            type="range"
+            id="simulation"
+            min="60"
+            max="180"
+            value={simulationRate}
+            onChange={handleSimulationChange}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+          />
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <MonitorBox
             title="Heart Rate"
@@ -198,6 +313,8 @@ export default function Component() {
             icon={<Heart className="w-6 h-6" />}
             color="text-red-500"
             bgColor="bg-red-100"
+            showGraph={true}
+            rate={heartRate}
           />
           <MonitorBox
             title="Pulse Rate"
@@ -205,6 +322,8 @@ export default function Component() {
             icon={<Activity className="w-6 h-6" />}
             color="text-blue-500"
             bgColor="bg-blue-100"
+            showGraph={true}
+            rate={pulseRate}
           />
           <MonitorBox
             title="Sound Level"
@@ -263,18 +382,6 @@ export default function Component() {
           />
         </div>
       </div>
-    </div>
-  )
-}
-
-function MonitorBox({ title, value, icon, color, bgColor }) {
-  return (
-    <div className={`rounded-lg shadow-md p-6 ${bgColor}`}>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">{title}</h2>
-        <div className={color}>{icon}</div>
-      </div>
-      <p className="text-3xl font-bold">{value}</p>
     </div>
   )
 }
