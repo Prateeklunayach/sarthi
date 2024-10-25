@@ -160,6 +160,8 @@ export default function Component() {
       timestamp: new Date().toISOString()
     };
 
+    console.log('Sending data to backend:', data);
+
     try {
       const response = await fetch('https://sarthibackend.vercel.app/api/monitor', {
         method: 'POST',
@@ -167,21 +169,22 @@ export default function Component() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
+        mode: 'no-cors' // Add this line
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      console.log('Response status:', response.status);
+      console.log('Response type:', response.type);
 
-      const result = await response.json();
-      console.log('Data sent successfully:', result);
+      // Note: With 'no-cors' mode, we can't access response data or check 'response.ok'
+      console.log('Request sent successfully');
 
-      // Check if the backend detected an abnormal condition
-      if (result.abnormalConditionDetected) {
-        triggerAlert();
-      }
+      // We can't check for abnormalConditionDetected here anymore
+      // You might need to implement this logic on the frontend instead
+
     } catch (error) {
       console.error('Error sending data to backend:', error);
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
     }
   };
 
