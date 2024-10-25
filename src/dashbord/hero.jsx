@@ -152,12 +152,16 @@ export default function Component() {
       stressLevel,
       pulseRate,
       detectedKeyword,
-      location,
+      location: location ? {
+        latitude: location.lat,
+        longitude: location.lng
+      } : null,
+      soundLevel,
       timestamp: new Date().toISOString()
     };
 
     try {
-      const response = await fetch('/api/send-data', {  // Replace with your actual API endpoint
+      const response = await fetch('https://sarthibackend.vercel.app/api/monitor', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -171,6 +175,11 @@ export default function Component() {
 
       const result = await response.json();
       console.log('Data sent successfully:', result);
+
+      // Check if the backend detected an abnormal condition
+      if (result.abnormalConditionDetected) {
+        triggerAlert();
+      }
     } catch (error) {
       console.error('Error sending data to backend:', error);
     }
