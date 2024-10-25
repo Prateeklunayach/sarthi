@@ -2,13 +2,13 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 
-import { Heart, Activity, Volume2, AlertTriangle, Mic, MapPin } from 'lucide-react'
+import { Heart, Activity, Volume2, AlertTriangle, Mic, MapPin, Brain } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 
 // Import Leaflet icon images
-import icon from '/Users/prateeklunayach/Desktop/sarthi/sarthi/public/map.png';
+import icon from '/map.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
 // Set up the default icon for Leaflet
@@ -99,7 +99,7 @@ function LocationMarker() {
 }
 
 export default function Component() {
-  const [heartRate, setHeartRate] = useState(70)
+  const [stressLevel, setStressLevel] = useState(50)
   const [pulseRate, setPulseRate] = useState(75)
   const [soundLevel, setSoundLevel] = useState(0)
   const [detectedKeyword, setDetectedKeyword] = useState('')
@@ -115,15 +115,11 @@ export default function Component() {
 
   const [alertTimeout, setAlertTimeout] = useState(null)
   const [showPopup, setShowPopup] = useState(false)
-  const [simulationRate, setSimulationRate] = useState(70)
 
-  // Remove or comment out the useEffect for simulating heart rate and pulse rate changes
-  //as we'll now control these directly in the alert logic
   useEffect(() => {
-    // Simulate heart rate and pulse rate changes
-    const interval = setInterval(() => {
-      setHeartRate(prev => Math.floor(Math.random() * (100 - 60 + 1) + 60))
-      setPulseRate(prev => Math.floor(Math.random() * (100 - 60 + 1) + 60))
+    // Simulate stress level changes
+    const stressInterval = setInterval(() => {
+      setStressLevel(prev => Math.max(0, Math.min(100, prev + Math.floor(Math.random() * 21) - 10)))
     }, 3000)
 
     // Get user's location
@@ -145,12 +141,15 @@ export default function Component() {
     const intervalId = setInterval(sendDataToBackend, 5000);
 
     // Clean up interval on component unmount
-    return () => clearInterval(intervalId);
+    return () => {
+      clearInterval(stressInterval)
+      clearInterval(intervalId);
+    }
   }, [])
 
   const sendDataToBackend = async () => {
     const data = {
-      heartRate,
+      stressLevel,
       pulseRate,
       detectedKeyword,
       location,
@@ -179,9 +178,9 @@ export default function Component() {
 
   const startListening = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)()
       analyserRef.current = audioContextRef.current.createAnalyser()
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       microphoneRef.current = audioContextRef.current.createMediaStreamSource(stream)
       microphoneRef.current.connect(analyserRef.current)
 
@@ -189,86 +188,44 @@ export default function Component() {
       const bufferLength = analyserRef.current.frequencyBinCount
       const dataArray = new Uint8Array(bufferLength)
 
-      const updateAudioData = () => {
-        if (!isListening) return
-
+      const updateSoundLevel = () => {
         analyserRef.current.getByteFrequencyData(dataArray)
-        const average = dataArray.reduce((acc, value) => acc + value, 0) / bufferLength
-        const normalizedSoundLevel = Math.min(100, Math.round((average / 128) * 100))
-        setSoundLevel(normalizedSoundLevel)
-
-        requestAnimationFrame(updateAudioData)
+        const average = dataArray.reduce((acc, val) => acc + val, 0) / bufferLength
+        setSoundLevel(Math.round((average / 255) * 100))
+        requestAnimationFrame(updateSoundLevel)
       }
 
-      updateAudioData()
-      setIsListening(true)
+      updateSoundLevel()
 
-      // Set a timeout to trigger the alert after 5 seconds
-      const timeout = setTimeout(() => {
-        setDetectedKeyword('help')
-        setShowAlert(true)
-        setHeartRate(Math.floor(Math.random() * (130 - 110 + 1) + 110))
-        setPulseRate(Math.floor(Math.random() * (130 - 110 + 1) + 110))
-        
-        // Set another timeout for the popup
-        setTimeout(() => {
-          setShowPopup(true)
-          // Hide popup after 3 seconds
-          setTimeout(() => setShowPopup(false), 3000)
-        }, 5000)
-      }, 5000)
-
-      setAlertTimeout(timeout)
-
-      // Start speech recognition
+      // Speech recognition setup
       if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = true;
-        recognitionRef.current.interimResults = true;
-        recognitionRef.current.lang = 'en-US';
-
-        recognitionRef.current.onstart = () => {
-          console.log('Speech recognition started');
-          setIsListening(true);
-        };
+        const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition
+        recognitionRef.current = new SpeechRecognition()
+        recognitionRef.current.continuous = true
+        recognitionRef.current.interimResults = true
+        recognitionRef.current.lang = 'en-US'
 
         recognitionRef.current.onresult = (event) => {
-          const lastResultIndex = event.results.length - 1;
-          const transcript = event.results[lastResultIndex][0].transcript.toLowerCase();
-
-          console.log('Transcript:', transcript);
-
-          // Update detected keyword in real-time
-          setDetectedKeyword(transcript);
+          const transcript = Array.from(event.results)
+            .map(result => result[0].transcript)
+            .join('')
+          
+          console.log('Transcript:', transcript)
 
           keywords.forEach(keyword => {
-            if (transcript.includes(keyword.toLowerCase())) {
-              console.log('Keyword detected:', keyword);
-              setDetectedKeyword(keyword);
-              setShowAlert(true);
-              setTimeout(() => setShowAlert(false), 5000);
+            if (transcript.toLowerCase().includes(keyword.toLowerCase())) {
+              setDetectedKeyword(keyword)
+              triggerAlert()
             }
-          });
-        };
+          })
+        }
 
-        recognitionRef.current.onerror = (event) => {
-          console.error('Speech recognition error:', event.error);
-        };
-
-        recognitionRef.current.onend = () => {
-          console.log('Speech recognition ended');
-          // Restart if still listening
-          if (isListening) {
-            recognitionRef.current.start();
-          }
-        };
-
-        recognitionRef.current.start();
+        recognitionRef.current.start()
       } else {
-        console.error('Speech Recognition API not supported in this browser');
-        alert('Speech Recognition is not supported in this browser. Please try using Google Chrome.');
+        console.error('Speech Recognition API not supported in this browser')
       }
+
+      setIsListening(true)
     } catch (error) {
       console.error('Error accessing microphone:', error)
     }
@@ -294,11 +251,13 @@ export default function Component() {
     }
   }
 
-  const handleSimulationChange = (event) => {
-    const newRate = parseInt(event.target.value)
-    setSimulationRate(newRate)
-    setHeartRate(newRate)
-    setPulseRate(newRate)
+  const triggerAlert = () => {
+    setShowAlert(true)
+    const timeout = setTimeout(() => {
+      setShowPopup(true)
+      setTimeout(() => setShowPopup(false), 3000)
+    }, 5000)
+    setAlertTimeout(timeout)
   }
 
   return (
@@ -323,29 +282,13 @@ export default function Component() {
             </div>
           </div>
         )}
-        <div className="mb-8">
-          <label htmlFor="simulation" className="block text-sm font-medium text-gray-700">
-            Simulation Rate: {simulationRate} BPM
-          </label>
-          <input
-            type="range"
-            id="simulation"
-            min="60"
-            max="180"
-            value={simulationRate}
-            onChange={handleSimulationChange}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-          />
-        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <MonitorBox
-            title="Heart Rate"
-            value={`${heartRate} BPM`}
-            icon={<Heart className="w-6 h-6" />}
+            title="Stress Level"
+            value={`${stressLevel}%`}
+            icon={<Brain className="w-6 h-6" />}
             color="text-red-500"
             bgColor="bg-red-100"
-            showGraph={true}
-            rate={heartRate}
           />
           <MonitorBox
             title="Pulse Rate"
