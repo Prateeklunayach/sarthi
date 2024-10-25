@@ -261,10 +261,10 @@ export default function Component() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-pink-100 to-purple-200">
+    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-purple-200">
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-5xl font-bold text-center mb-2 text-purple-800">Rashmi's Dashboard</h1>
-        <h2 className="text-4xl font-bold text-center mb-4 text-purple-800">Sarthi</h2>
+        <img src="/logo.png" alt="logo" className="w-40 h-40 mx-auto mt-1 " />
+        <h2 className="text-3xl font-bold text-center mb-4 text-black-800 font-nunito">SARTHI</h2>
         <p className="text-center text-purple-600 mb-8">
           Real-time monitoring for enhanced safety and peace of mind.
         </p>
@@ -282,7 +282,7 @@ export default function Component() {
             </div>
           </div>
         )}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
           <MonitorBox
             title="Stress Level"
             value={`${stressLevel}%`}
@@ -353,7 +353,7 @@ export default function Component() {
             value={keywords.join(', ')}
             onChange={(e) => setKeywords(e.target.value.split(',').map(k => k.trim()))}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-          />
+          /> 
         </div>
       </div>
     </div>
